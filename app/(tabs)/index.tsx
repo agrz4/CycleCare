@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { useRouter } from 'expo-router';
+import { format } from 'date-fns';
 import { useCycleStore } from '@/src/store/cycleStore';
 import { PhaseCard } from '@/src/components/PhaseCard';
 import { getCurrentPhaseDayNumber, getPhaseByDay } from '@/src/utils/cycleCalculator';
 
 export default function DashboardScreen() {
-  const { profile, phases, setProfile } = useCycleStore();
+  const router = useRouter();
+  const { profile, phases, setProfile, symptomLogs } = useCycleStore();
   const [dayInCycle, setDayInCycle] = useState(1);
   const [currentPhase, setCurrentPhase] = useState(phases[0]);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const hasLoggedToday = symptomLogs[todayStr];
 
   useEffect(() => {
     // For demo purposes, if profile doesn't exist, we set one up automatically.
@@ -53,8 +58,27 @@ export default function DashboardScreen() {
         <Text style={styles.sectionTitle}>Status Hari Ini</Text>
         <PhaseCard phase={currentPhase} dayInCycle={dayInCycle} />
 
-        <TouchableOpacity style={styles.logButton}>
-          <Text style={styles.logButtonText}>+ Catat Gejala Hari Ini</Text>
+        {hasLoggedToday && (
+          <View style={styles.loggedSummary}>
+            <Text style={styles.summaryTitle}>Gejala yang dicatat:</Text>
+            <View style={styles.summaryTags}>
+              {hasLoggedToday.mood.map(m => (
+                <View key={m} style={styles.tag}><Text style={styles.tagText}>{m}</Text></View>
+              ))}
+              {hasLoggedToday.pain.map(p => (
+                <View key={p} style={[styles.tag, { backgroundColor: '#FEE2E2' }]}><Text style={[styles.tagText, { color: '#E53E3E' }]}>{p}</Text></View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity 
+          style={[styles.logButton, hasLoggedToday && styles.logButtonActive]}
+          onPress={() => router.push('/log-symptom')}
+        >
+          <Text style={[styles.logButtonText, hasLoggedToday && styles.logButtonTextActive]}>
+            {hasLoggedToday ? '✓ Edit Catatan Hari Ini' : '+ Catat Gejala Hari Ini'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -131,9 +155,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
   },
+  logButtonActive: {
+    backgroundColor: '#E6FFFA',
+    borderColor: '#38B2AC',
+  },
   logButtonText: {
     fontSize: 16,
     fontWeight: '700',
+    color: '#4A5568',
+  },
+  logButtonTextActive: {
+    color: '#2C7A7B',
+  },
+  loggedSummary: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#EDF2F7',
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4A5568',
+    marginBottom: 10,
+  },
+  summaryTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tag: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#4A5568',
   },
 });
