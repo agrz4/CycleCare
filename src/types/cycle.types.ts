@@ -10,6 +10,8 @@ export interface UserProfile {
   name: string;
   role: 'female' | 'partner';
   partnerCode?: string;
+  partnerName?: string;
+  partnerMessage?: string;
   cycleLength: number;
   periodDuration: number;
   lastPeriodStart: string; // ISO String
