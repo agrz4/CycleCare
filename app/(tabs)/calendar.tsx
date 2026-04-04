@@ -3,8 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { addDays, eachDayOfInterval, format, isSameDay, startOfWeek, subDays } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Dimensions, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { Dimensions, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, Alert, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Calendar } from 'react-native-calendars';
 
@@ -19,12 +19,62 @@ export default function CalendarScreen() {
   const [partnerActionSent, setPartnerActionSent] = useState(false);
   const [isMonthlyVisible, setIsMonthlyVisible] = useState(false);
 
+  // Animation states for insights
+  const [activeInsight, setActiveInsight] = useState<'diet' | 'mood' | 'exercise' | null>(null);
+  const dietAnim = useRef(new Animated.Value(100)).current; 
+  const moodAnim = useRef(new Animated.Value(100)).current;
+  const exerciseAnim = useRef(new Animated.Value(100)).current;
+
+  // Animation states for stats
+  const [activeStat, setActiveStat] = useState<'sleep' | 'together' | null>(null);
+  const sleepStatAnim = useRef(new Animated.Value(100)).current;
+  const togetherStatAnim = useRef(new Animated.Value(100)).current;
+
   // Calendar days for the current displayed week
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 });
   const calendarDays = eachDayOfInterval({ 
     start: addDays(weekStart, -1), 
     end: addDays(weekStart, 7) 
   });
+
+  useEffect(() => {
+    Animated.spring(dietAnim, {
+      toValue: activeInsight === 'diet' ? 0 : 100,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+
+    Animated.spring(moodAnim, {
+      toValue: activeInsight === 'mood' ? 0 : 100,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+
+    Animated.spring(exerciseAnim, {
+      toValue: activeInsight === 'exercise' ? 0 : 100,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+  }, [activeInsight]);
+
+  useEffect(() => {
+    Animated.spring(sleepStatAnim, {
+      toValue: activeStat === 'sleep' ? 0 : 100,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+
+    Animated.spring(togetherStatAnim, {
+      toValue: activeStat === 'together' ? 0 : 100,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+  }, [activeStat]);
 
   const handleDayPress = (day: Date) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -44,12 +94,31 @@ export default function CalendarScreen() {
   const handlePartnerAction = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setPartnerActionSent(true);
+    Alert.alert('Love Sent!', `You've sent a virtual hug to ${profile?.partnerName || 'Agra'}! ❤️`);
     setTimeout(() => setPartnerActionSent(false), 2000);
   };
 
   const toggleMonthly = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsMonthlyVisible(!isMonthlyVisible);
+  };
+
+  const handleInsightPress = (type: 'diet' | 'mood' | 'exercise') => {
+    Haptics.selectionAsync();
+    if (activeInsight === type) {
+      setActiveInsight(null);
+    } else {
+      setActiveInsight(type);
+    }
+  };
+
+  const handleStatPress = (type: 'sleep' | 'together') => {
+    Haptics.selectionAsync();
+    if (activeStat === type) {
+      setActiveStat(null);
+    } else {
+      setActiveStat(type);
+    }
   };
 
   return (
@@ -119,7 +188,7 @@ export default function CalendarScreen() {
               <Text style={styles.headerGreeting}>Good Morning, {profile?.name || 'Cha'}!</Text>
               <TouchableOpacity 
                 style={styles.cogIcon}
-                onPress={() => Haptics.selectionAsync()}
+                onPress={() => Alert.alert('Settings', 'User profile settings will be implemented soon.')}
               >
                 <Ionicons name="settings-sharp" size={24} color="white" />
               </TouchableOpacity>
@@ -150,6 +219,7 @@ export default function CalendarScreen() {
             >
               <Ionicons name="close" size={28} color="#FF9A62" />
             </TouchableOpacity>
+
 
             <Text style={styles.pageTitle}>Calendar</Text>
 
@@ -196,30 +266,67 @@ export default function CalendarScreen() {
           <View style={styles.insightScroll}>
             <TouchableOpacity 
               style={[styles.insightTile, { backgroundColor: '#CCE2A3' }]}
-              onPress={() => Haptics.selectionAsync()}
-            />
+              onPress={() => handleInsightPress('diet')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="restaurant" size={24} color="#556B2F" />
+              <Animated.View style={[styles.insightOverlay, { transform: [{ translateY: dietAnim }] }]}>
+                <Text style={styles.insightOverlayText}>Iron-rich foods like spinach help today.</Text>
+              </Animated.View>
+            </TouchableOpacity>
+
             <TouchableOpacity 
               style={[styles.insightTile, { backgroundColor: '#FC94C1' }]} 
-              onPress={() => Haptics.selectionAsync()}
-            />
+              onPress={() => handleInsightPress('mood')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="happy" size={24} color="#8B008B" />
+              <Animated.View style={[styles.insightOverlay, { transform: [{ translateY: moodAnim }] }]}>
+                <Text style={styles.insightOverlayText}>Self-care is key! Try meditation.</Text>
+              </Animated.View>
+            </TouchableOpacity>
+
             <TouchableOpacity 
               style={[styles.insightTile, { backgroundColor: '#9DD9F3' }]} 
-              onPress={() => Haptics.selectionAsync()}
-            />
+              onPress={() => handleInsightPress('exercise')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="walk" size={24} color="#1A365D" />
+              <Animated.View style={[styles.insightOverlay, { transform: [{ translateY: exerciseAnim }] }]}>
+                <Text style={styles.insightOverlayText}>Light walking is great for recovery.</Text>
+              </Animated.View>
+            </TouchableOpacity>
           </View>
 
           {/* Stats Section */}
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => handleStatPress('sleep')}
+              activeOpacity={0.8}
+            >
               <Text style={styles.statTitle}>Sleep Track</Text>
               <Text style={styles.statValue}>{isSameDay(selectedDate, new Date()) ? '3,35 Hr' : '--'}</Text>
               <View style={[styles.statAccent, { backgroundColor: '#EE5D5D' }]} />
-            </View>
-            <View style={styles.statCard}>
+              
+              <Animated.View style={[styles.statOverlay, { transform: [{ translateY: sleepStatAnim }] }]}>
+                <Text style={styles.statOverlayText}>Avg sleep tracked. Keeping consistent helps accuracy!</Text>
+              </Animated.View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => handleStatPress('together')}
+              activeOpacity={0.8}
+            >
               <Text style={styles.statTitle}>Days Together</Text>
               <Text style={styles.statValue}>1035</Text>
               <View style={[styles.statAccent, { backgroundColor: '#62B6CB' }]} />
-            </View>
+
+              <Animated.View style={[styles.statOverlay, { transform: [{ translateY: togetherStatAnim }] }]}>
+                <Text style={styles.statOverlayText}>You and {profile?.partnerName || 'Agra'} share 1035 wonderful days!</Text>
+              </Animated.View>
+            </TouchableOpacity>
           </View>
 
           {/* Send Love Section */}
@@ -429,6 +536,32 @@ const styles = StyleSheet.create({
     width: '31%',
     aspectRatio: 0.85,
     borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  insightOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  insightOverlayText: {
+    color: 'white',
+    fontSize: 10,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    lineHeight: 14,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -443,6 +576,24 @@ const styles = StyleSheet.create({
     height: 100,
     position: 'relative',
     overflow: 'hidden',
+  },
+  statOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#1A365D', // Dark blue for calendar overlay
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statOverlayText: {
+    color: 'white',
+    fontSize: 11,
+    textAlign: 'center',
+    fontWeight: '600',
+    lineHeight: 16,
   },
   statTitle: {
     fontSize: 17,

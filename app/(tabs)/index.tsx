@@ -4,8 +4,8 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { addDays, eachDayOfInterval, format, isSameDay, startOfWeek } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Dimensions, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { Dimensions, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, Alert, Animated } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -22,6 +22,11 @@ export default function DashboardScreen() {
   const isNight = hour >= 18 || hour < 6;
   const greeting = isNight ? 'Good Night, ' : 'Good Morning, ';
   const timeIcon = isNight ? 'moon-o' : 'sun-o';
+
+  // State for animated metric cards
+  const [activeCard, setActiveCard] = useState<'sleep' | 'together' | null>(null);
+  const sleepAnim = useRef(new Animated.Value(110)).current; // Start hidden below
+  const togetherAnim = useRef(new Animated.Value(110)).current;
 
   // Calendar days for the current week
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -54,6 +59,51 @@ export default function DashboardScreen() {
     }
   }, [profile, phases]);
 
+  useEffect(() => {
+    Animated.spring(sleepAnim, {
+      toValue: activeCard === 'sleep' ? 0 : 110,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+
+    Animated.spring(togetherAnim, {
+      toValue: activeCard === 'together' ? 0 : 110,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+  }, [activeCard]);
+
+  const handleCogPress = () => {
+    Alert.alert('Settings', 'User profile and notification settings will be available soon!');
+  };
+
+  const handlePartnerNotify = () => {
+    Alert.alert('Notified!', `We've sent your current mood and phase status to ${profile?.partnerName || 'your partner'}.`);
+  };
+
+  const handleDayPress = (day: Date) => {
+    const formattedDate = format(day, 'yyyy-MM-dd');
+    const log = symptomLogs[formattedDate];
+    if (log) {
+      Alert.alert('Day Log', `Mood: ${log.mood.join(', ') || 'N/A'}\nSymptoms: ${log.pain.join(', ') || 'None'}`);
+    } else {
+      Alert.alert('No Log', `You haven't logged anything for ${format(day, 'MMMM d')}. Would you like to log now?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Now', onPress: () => router.push('/log-symptom') }
+      ]);
+    }
+  };
+
+  const handleMiniCardPress = (type: 'sleep' | 'together') => {
+    if (activeCard === type) {
+      setActiveCard(null);
+    } else {
+      setActiveCard(type);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
@@ -73,14 +123,14 @@ export default function DashboardScreen() {
               <View style={styles.greetingRow}>
                 <Text style={styles.greetingPrefix}>{greeting}</Text>
                 <Text style={styles.greetingName}>{profile?.name || 'Sayang'}!</Text>
-                <TouchableOpacity style={styles.cogButton}>
+                <TouchableOpacity style={styles.cogButton} onPress={handleCogPress}>
                   <FontAwesome name={timeIcon} size={24} color="#E45D5D" />
                 </TouchableOpacity>
               </View>
 
               <Text style={styles.mainTitle}>How Do You Feel Today?</Text>
 
-              <TouchableOpacity style={styles.knowMoreButton}>
+              <TouchableOpacity style={styles.knowMoreButton} onPress={handlePartnerNotify}>
                 <Text style={styles.knowMoreText}>Let's {profile?.partnerName?.split(' ')[0] || 'Agra'} know</Text>
               </TouchableOpacity>
             </View>
@@ -151,7 +201,10 @@ export default function DashboardScreen() {
                         </View>
                       )}
 
-                      <View style={[styles.dayWrapper, isToday && styles.activeDayWrapper]}>
+                      <TouchableOpacity 
+                        style={[styles.dayWrapper, isToday && styles.activeDayWrapper]}
+                        onPress={() => handleDayPress(day)}
+                      >
                         <Text style={[styles.dayLetter, isToday && styles.activeDayLetter]}>
                           {format(day, 'EEEEE')}
                         </Text>
@@ -165,7 +218,7 @@ export default function DashboardScreen() {
                         {(index >= 1 && index <= 5 && !isToday) && (
                           <View style={styles.dotIndicator} />
                         )}
-                      </View>
+                      </TouchableOpacity>
                     </View>
                   );
                 })}
@@ -173,17 +226,39 @@ export default function DashboardScreen() {
 
               {/* Bottom Mini Cards */}
               <View style={styles.miniCardsRow}>
-                <View style={[styles.miniCard, styles.sleepCard]}>
+                <TouchableOpacity 
+                  style={[styles.miniCard, styles.sleepCard]}
+                  onPress={() => handleMiniCardPress('sleep')}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.miniCardTitle}>Sleep Track</Text>
                   <Text style={styles.miniCardValue}>3,35 Hr</Text>
                   <View style={styles.cardAccent} />
-                </View>
+                  
+                  <Animated.View style={[
+                    styles.cardInfoOverlay, 
+                    { transform: [{ translateY: sleepAnim }] }
+                  ]}>
+                    <Text style={styles.cardInfoText}>Avg: 3.35hr. Target: 7-8hr for recovery.</Text>
+                  </Animated.View>
+                </TouchableOpacity>
 
-                <View style={[styles.miniCard, styles.daysTogetherCard]}>
+                <TouchableOpacity 
+                  style={[styles.miniCard, styles.daysTogetherCard]}
+                  onPress={() => handleMiniCardPress('together')}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.miniCardTitle}>Days Together</Text>
                   <Text style={styles.miniCardValue}>1035</Text>
                   <View style={styles.cardAccent} />
-                </View>
+
+                  <Animated.View style={[
+                    styles.cardInfoOverlay, 
+                    { transform: [{ translateY: togetherAnim }] }
+                  ]}>
+                    <Text style={styles.cardInfoText}>You & {profile?.partnerName || 'Agra'} have shared 1035 days!</Text>
+                  </Animated.View>
+                </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
@@ -219,13 +294,13 @@ const styles = StyleSheet.create({
   greetingPrefix: {
     fontSize: 20,
     color: '#8A1C1C',
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontFamily: 'Domine-Bold',
     fontWeight: '700',
   },
   greetingName: {
     fontSize: 20,
     color: '#8A1C1C',
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontFamily: 'Chonburi',
     fontWeight: '700',
   },
   cogButton: {
@@ -237,7 +312,7 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontSize: 48,
     color: '#8A1C1C',
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontFamily: 'Chonburi',
     fontWeight: 'bold',
     lineHeight: 52,
     marginTop: 10,
@@ -258,6 +333,7 @@ const styles = StyleSheet.create({
   },
   knowMoreText: {
     color: '#8A1C1C',
+    fontFamily: 'Domine-Bold',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -292,6 +368,7 @@ const styles = StyleSheet.create({
   phaseLabel: {
     color: 'white',
     fontSize: 14,
+    fontFamily: 'Domine-Bold',
     fontWeight: '600',
     letterSpacing: 2,
     marginBottom: 5,
@@ -300,11 +377,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 42,
     fontWeight: 'bold',
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontFamily: 'Chonburi',
   },
   daySubLabel: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: 16,
+    fontFamily: 'Domine-Bold',
     fontWeight: '600',
     marginBottom: 20,
   },
@@ -414,8 +491,8 @@ const styles = StyleSheet.create({
   miniCardTitle: {
     fontSize: 16,
     color: '#8A1C1C',
+    fontFamily: 'Domine-Bold',
     fontWeight: 'bold',
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     marginBottom: 4,
   },
   miniCardValue: {
@@ -431,6 +508,25 @@ const styles = StyleSheet.create({
     height: '45%',
     backgroundColor: '#F36060', // Red accent
     borderTopLeftRadius: 20,
+  },
+  cardInfoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#8A1C1C',
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardInfoText: {
+    color: 'white',
+    fontSize: 13,
+    textAlign: 'center',
+    fontFamily: 'Domine-Bold',
+    fontWeight: '600',
+    lineHeight: 18,
   },
   sleepCard: {},
   daysTogetherCard: {},
@@ -479,12 +575,13 @@ const styles = StyleSheet.create({
   partnerNameText: {
     fontSize: 18,
     color: 'white',
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontFamily: 'Domine-Bold',
     fontWeight: 'bold',
   },
   reminderMessageText: {
     fontSize: 15,
     color: 'white',
+    fontFamily: 'Domine-Regular',
     lineHeight: 20,
     paddingRight: 40,
   },
